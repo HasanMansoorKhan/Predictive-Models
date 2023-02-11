@@ -161,7 +161,7 @@ data <- data %>%
 ```
 
 
-Once, the data is cleaned, I am have 15,372 observations and 32 variables. This data will be written as a clean version. The predictive models will have this clean data set as input data frame. 
+Once, the data is cleaned, I am have 16,187 observations and 32 variables. This data will be written as a clean version. The predictive models will have this clean data set as input data frame. 
 
 
 ```{r, include = FALSE, message=FALSE, warning=FALSE}
@@ -312,7 +312,18 @@ write.csv(data,"istanbul_clean.csv")
 ```
 
 
-### END of cleaning ### 
+
+## EXPLORATORY DATA ANALYSIS
+
+After completing data wrangling, my aim is to conduct exploratory data analysis. In other words, I want to know my data better. I have data for a single city Istanbul for a specific date, 30th December 2022. My goal is to understand the descriptive summary statistics of my data by visualizing its distribution. Apart from their distribution, I aim to identify the relationship between my predictor variables and target variable, price. The important distinction to make is between the target varaible: Price and the predictors: accommodates, amenities and property type. This can be refered to as:
+
+* Label Engineering
+* Feature Engineering
+
+
+## LABEL ENGINEERING 
+
+The target variable price, which has been converted to numeric is key area of interest in this analysis. My goal is to predict the price for rentals with accommodates 2 to 6 persons. Before I predict, I want to understand the distribution of this integral variable. The summary statistics of price suggest that the mean is 1,316 TRL which is almost 19 TRY to a single U.S dollar. Hence, the mean in USD is approximately USD69.26. The maximum price is an astounding 1,793,208 TRY and is most propably an error. However, it is not removed as this value is in the target variable and will be kept due to this reason. It is more imporrant to view the distrubtion of price which can be visualized in the histograms.  
 
 
 ```{r, echo = FALSE, message=FALSE, warning=FALSE, include=FALSE}
@@ -337,11 +348,15 @@ price_stat <- data %>% summarise(
 ```
 
 ```{r, , echo = FALSE, message=FALSE, warning=FALSE}
-# print table
+# PRINT TABLE
 price_stat <- knitr::kable( price_stat, caption = "Descriptive statistics of target variable", digits = 2 ) %>% kable_styling( position = "center", latex_options = 'hold_position' )
 price_stat
 ```
 
+
+ As seen below, the target variable price has a relatively longer right tail. This is primarily due to the fact that the mean is larger than the median. Hence the price is slightly skewed. I conduct a log transformation & visualize its distribution which shows that it results in a slightly left side tail rather than normal distribution. Therefore, since log is not achieving a near perfect normal distribution, I decide to keep price as the main target variable rather than the transformation or log of price. Price seems normal to a great extent keeping in mind the inclusivity represented by price variable. 
+ 
+ 
 ```{r, echo = FALSE, message=FALSE, warning=FALSE, fig.align='center', fig.width=8}
 ###### Price ######
 # Take log of price
@@ -371,6 +386,17 @@ price_hist_grid <- ggarrange(
 price_hist_grid 
 ```
 
+## FEATURE ENGINEERING
+
+Feautre engineering is considered of the one of the most important considerations for a data analyst while conducting prediction models. Hence, great emphasis is placed on descriptive statistics, distributions and interactivity of predictor variables. 
+
+To begin with, accommodation capicity or accommodates, is considered. The data is restricted from 2 to 6 accommodates and its distribution can be viewed in the histogram below. As seen, maximum accommodations are where accommodates is 2 people. This shows that the most common listing at Airbnb for Istanbul have an accommodation capacity for only two people. Then moving on to larger values, the count significantly drops for accommodations with 3 people. A significant proportion of accommodation listings have the accommodation capacity of four persons. Lastly, very few listings have 5-6 people as accommodates. 
+
+I then visualize the impact of accommodates and price. A clear trend can be identified, that as accommodation capacity increases, the price will increase also. However, to be more specific, a significant increase is visualized when a property has 4 accommodates instead of 3. 
+
+For accommodation capacity, I also take into account whether the property is instantly bookable or not. This is a binary variable and is color coded as seen below. From 2 to 6 accommodates, the box plots reveal that as accommodates increase, the number of listings get more costly on average. For example, majority of listings with 2 accommodates lie in the price bracket 1000 to 1500, while a vast majority of 5 and 6 accommodation capacity listing have a price from 150 to 250, signifying an overall higher price of listing with 5-6 accommodates. 
+
+
 ```{r, echo = FALSE, warning = FALSE, message = FALSE, fig.align='center', fig.width=10}
 ### FEATURE ENGINEERING ###
 ###### accommodation capacity & price ######
@@ -397,6 +423,12 @@ accom_combine <- ggarrange(
   nrow = 1)
 accom_combine
 ```
+
+
+Another crucial predictor is the accommodation type and its distribution as well as impact on price. For this purpose, a box plot can be visualized showing the property type on the x axis with price on y axis while the box plots show the distribution across price. As seen below, apartments listings are relatively higher in price compared to rental units. This may be attributed to a multitude of factors for example apartments generally include those with higher accommodation capacity or great amenities which lead to a higher price distribution for apartments. 
+
+A box plot is also shown on the bottom right with accommodation capacity and type incorporated. This is box plots shows that for all accommodation capacities the apartments are higher in price compared to rental units. A minor exception is at accommodation capacity of 5 persons, where apartments or rentals are similarly priced. 
+
 
 ```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.align='center'}
 ###### Property Type & Price ######
