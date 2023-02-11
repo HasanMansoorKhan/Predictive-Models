@@ -1,0 +1,506 @@
+---
+title: "Istanbul Airbnb Price Prediction"
+author: "Hasan Mansoor Khan"
+date: "`r Sys.Date()`"
+geometry: margin=1.6cm
+output:
+  html_document: default
+  word_document: default
+  pdf_document: default
+fontsize: 9pt
+---
+
+
+```{r libraries, include = FALSE, message=FALSE, warning=FALSE}
+# Clear the environment
+rm(list=ls())
+# Import all relevant libraries
+library(rmdformats)
+library(kableExtra)
+library(tidyverse)
+library(rmdformats)
+library(scales)
+library(Metrics)
+library(caret)
+library(ggpubr)
+library(cowplot)
+library(stringr) 
+library(rstatix)
+library(dplyr)
+library(skimr)
+library(modelsummary)
+library(grid)
+library(glmnet)
+library(Hmisc)
+library(ranger)
+library(RColorBrewer)
+library(pdp)
+library(gbm)
+library(rattle)
+# Using a color scheme for various charts
+colours <- c(brewer.pal( 3, "Set2" )[1], brewer.pal( 3, "Set2" )[2], brewer.pal( 3, "Set2" )[3])
+```
+
+## INTRODUCTION TO THE PROJECT
+
+The prediction project aims to predict prices for certain Airbnb listings. These listings are specifically accommodations in Istanbul, Turkey that can accommodate 2 to 6 persons. Furthermore, the analysis, uses various constraints and/or filters to incorporate only certain types of properties. This allows for a more comprehensive data input to the various prediction models. With important data cleaning, the models run at efficiency and provide valuable insights. 
+
+The project aims to predict the price which is the target variable depending on various predictors. The predictors impact th target variable with different intensity. For a predictive analysis, after cleaning the data, I run 5 predictive models which include:
+
+* OLS linear regression
+* LASSO
+* Random Forest
+* CART
+
+However, before running the prediction models, this report aims to shed some light on the data cleaning and transformation of certain variables before running the machine learning predictive models.
+
+
+## DATA SET OVERVIEW
+
+The data used is based on a specific date which is 30th December 2022 & can be found on the official website : [Inside Airbnb](http://insideairbnb.com/get-the-data/). The specific data is an important aspect of the analysis as it constraints the time dimension of the analysis. The choice of *30th December 2022* is in mainly due to the fact that it is the most recently available data. When the raw data is imported, there are 36,717 observations for a total of 75 variables. This project must ideally include 10,000 plus observations. The 36,000 plus observations seem to be too high for the analysis. However, after various cleaning and transformations the observations reach close to the required 10,000 plus observations. It is important to note that each observation represents a single rental property listed at Airbnb. Meanwhile, the 75 variables show important characteristics including but not limited to price per day, property type, neighborhood, listing url and various amenities provided by the property.
+
+
+## DATA WRANGLING 
+
+One of the most critical parts of this predictive analysis is data cleaning by removing errors, renaming columns, creating new variables, dropping irrelevant variables and creating a data set which is more accessible and efficient for the predictive models. In this regard I begin skimming the data set using Glimpse. I then proceed to limit by analysis by accommodates from 2 to 6 people. Furthermore, the most important variable for my analysis is the price per day which is the target variable. I mutate this variable into numeric type and remove the dollar signs. 
+
+Once the target variable is cleaned, I proceed to clean the predictor variables. These variables will be used to predict the value of the target variable.I drop columns that are not relevant for the analysis such as listing URL, scraping ID and many others. I then drop observations that have no value for target variable, price. Furthermore, I impute values for certain potential predictors including number of beds, accommodates and reviews. I then proceed to convert property types and neighborhood to factor variables & filter and keep only apartments and rental units as property types. Lastly, I use a function to extract the amenities and convert certain amenities as binary variables along with creating these amenities as dummy variables. 
+
+
+```{r Import data, message=FALSE, warning=FALSE, include=FALSE, cache=TRUE}
+# Import raw or uncleaned data
+data <- read.csv("istanbul_raw.csv")
+```
+
+```{r, include = FALSE, message=FALSE, warning=FALSE}
+# --------------------------- FIRST LOOK INTO DATA ------------------------ #
+glimpse(data)
+
+# Filter apartments for 2-6 persons
+data <- data %>%  filter(between(accommodates, 2, 6))
+str(data)
+# summary statistics 
+data %>%
+  group_by(accommodates) %>%
+  dplyr::summarize(mean_price = mean(price, na.rm=TRUE))
+Hmisc::describe(data$price)
+
+# Check for duplicates
+duplicated(names(data))
+
+# drop columns not in use
+data <- data[grep("^host", colnames(data), invert = TRUE)]
+data <- data %>% dplyr::select(-contains("maximum"))
+data <- data[grep("^calculated", colnames(data), invert = TRUE)]
+data <- data %>% select(-c("listing_url","scrape_id","last_scraped","name","description","neighborhood_overview","picture_url", "neighbourhood_group_cleansed","bathrooms","minimum_minimum_nights","minimum_nights_avg_ntm","calendar_updated","calendar_last_scraped","number_of_reviews_ltm","number_of_reviews_l30d","license","reviews_per_month","availability_30","availability_60","availability_90","availability_365","neighbourhood","has_availability", "first_review", "last_review"))
+
+## make numerical variables
+data <- data %>%
+  mutate(
+    price_day = as.numeric(gsub("[^0-9.]", "", price)))
+
+```
+
+
+
+
+```{r, include = FALSE, message=FALSE, warning=FALSE }
+# --------------------------- MISSING VALUES ------------------------ #
+
+# A) drop if no target value
+data <- data %>%
+  drop_na(price)
+
+# B) Impute if few, assuming beds is number of accommodates
+data <- data %>%
+  mutate(
+    beds = ifelse(is.na(beds), accommodates, beds), 
+    minimum_nights=ifelse(is.na(minimum_nights),1, minimum_nights),
+    number_of_reviews=ifelse(is.na(number_of_reviews),1, number_of_reviews),
+    beds=ifelse(is.na(beds),0, beds),
+  )
+
+# C) Drop variables with many missing values
+to_drop <- c("review_scores_value", "review_scores_communication")
+data <- data %>%
+  select(-one_of(to_drop))
+
+to_filter <- sapply(data, function(x) sum(is.na(x)))
+to_filter[to_filter > 0]
+
+# D)  Replace missing variables re-reviews with zero, when no review + add flags
+data <- data %>%
+  mutate(
+    flag_review_scores_rating = ifelse(is.na(review_scores_rating),1, 0),
+    review_scores_rating    = ifelse(is.na(review_scores_rating),median(review_scores_rating, na.rm = T), review_scores_rating))
+
+# check one flagged variable
+datasummary( factor(flag_review_scores_rating) ~ N , data) 
+
+```
+
+```{r, include = TRUE, message=FALSE, warning=FALSE}
+# --------------------------- FILTER PROPERTY TYPES ------------------------ #
+# property type is Entire serviced apartment, entire rental unit or Entire loft
+data <- data %>% 
+  filter( property_type %in% c('Entire serviced apartment', 'Entire rental unit') )
+
+# rename property_type categories 
+data <- data %>% mutate( property_type = 
+                         ifelse( property_type == 'Entire serviced apartment', 'apartment',
+                         ifelse( property_type == 'Entire rental unit', 'rental',".")))
+
+# property_type to factor variable
+data <- data %>%
+  mutate(f_property_type = factor(property_type))
+
+# neighborhood_cleansed to factor variable
+data <- data %>% 
+  mutate( f_neighbourhood = factor(neighbourhood_cleansed))
+
+```
+
+
+Once, the data is cleaned, I am have 15,372 observations and 32 variables. This data will be written as a clean version. The predictive models will have this clean data set as input data frame. 
+
+
+```{r, include = FALSE, message=FALSE, warning=FALSE}
+# --------------------------- EXTRACT NUMBER OF BATHROOMS ------------------------ #
+
+data <- data  %>% 
+  mutate(bathrooms = as.numeric(gsub("[a-zA-Z ]", "", data$bathrooms_text)))
+data$bathrooms_text <- NULL
+
+# add new numeric columns from certain columns
+numericals <- c("accommodates", "bathrooms" , "minimum_nights","beds" ,"review_scores_rating","number_of_reviews", "bedrooms")
+
+data <- data %>%
+  mutate_at(vars(numericals), funs("n"=as.numeric))
+
+# rename columns so they start with n_ as opposed to end with _n
+nnames <- data %>%
+  select(ends_with("_n")) %>%
+  names()
+nnames_i <- match(nnames, colnames(data))
+colnames(data)[nnames_i] <- paste0("n_", numericals)
+```
+
+```{r,include = FALSE, message=FALSE, warning=FALSE}
+# --------------------------- EXTRACT AMENITIES ------------------------ #
+
+# remove unnecessary signs and convert to list
+data$amenities <- tolower( data$amenities )
+data$amenities <- gsub("\\[","", data$amenities)
+data$amenities <- gsub("\\]","", data$amenities)
+data$amenities <- gsub('\\"',"",data$amenities)
+data$amenities <- as.list(strsplit(data$amenities, ","))
+
+# define levels and dummies and append to df
+levs <- levels(factor(unlist(data$amenities)))
+data <- cbind(data,as.data.frame(do.call(rbind, lapply(lapply(data$amenities, factor, levs), table))))
+
+# function to aggregate several columns of same type/category into one generic binary column
+aggregate_columns <- function(word){
+  
+  # subset columns which contain a specific word and save them to another dataframe, also select 'id' to use for merge later
+  new_df <- data %>% select(contains(word),"id")
+  
+  # go row by row to see if any of the rows have a 1, if it does, populate new column 'col_name' with 1
+  new_df$col_name <- apply(new_df[0:ncol(new_df)], 1, function(x) ifelse(any(x == 1), '1', '0'))
+  
+  # save new column and id column to another dataframe, this new dataframe is used to merge with original dataframe
+  new_df_merge <- new_df %>% select(id,col_name)
+  
+  # merge original dataframe and new_df_merge by 'id'
+  data <- merge(data,new_df_merge,by = "id", all = FALSE)
+  
+  # remove the new column and 'id' column from the new_df dataframe
+  new_df <- new_df %>% select(-c(id,col_name))
+
+  # remove the selected columns from original dataframe since they have already been aggregated into a new column and merged
+  data <<- data %>% select(-colnames(new_df))
+}
+
+# aggregate columns for a few amenities that could be important for predicting price
+aggregate_columns("wifi")
+data <- data %>% rename("wifi" = col_name)
+
+aggregate_columns("refrigerator")
+data <- data %>% rename("refrigerator" = col_name)
+
+aggregate_columns("air conditioning")
+data <- data %>% rename("air_conditioning" = col_name)
+
+aggregate_columns("baby")
+data <- data %>% rename("baby" = col_name)
+
+aggregate_columns("beach")
+data <- data %>% rename("beach" = col_name)
+
+aggregate_columns("stove")
+data <- data %>% rename("stove" = col_name)
+
+aggregate_columns("free parking")
+data <- data %>% rename("free_parking" = col_name)
+
+aggregate_columns("office")
+data <- data %>% rename("office" = col_name)
+
+aggregate_columns("coffee maker")
+data <- data %>% rename("coffee_maker" = col_name)
+
+aggregate_columns("garden")
+data <- data %>% rename("garden" = col_name)
+
+aggregate_columns("gym")
+data <- data %>% rename("gym" = col_name)
+
+# drop the amenities column because a csv cannot store it since it is a list
+data <- data %>% select( -amenities )
+
+# drop amenities that were not used (irrelevant columns dropped)
+data <- data[ -c(32:2057)]
+```
+
+```{r, include = FALSE, message=FALSE, warning=FALSE}
+# --------------------------- MAKE DUMMY VARIABLES ------------------------ #
+
+data$instant_bookable <- replace(data$instant_bookable,data$instant_bookable == 'TRUE', "1")
+data$instant_bookable <- replace(data$instant_bookable,data$instant_bookable == 'FALSE', "0")
+
+# rename dummies
+dummies <- c( "instant_bookable", "wifi", "refrigerator", "air_conditioning", "baby", "beach", "stove", "free_parking", "office", "coffee_maker", "garden", "gym")
+data <- data %>%
+  mutate_at(vars(dummies), funs("d"= (.)))
+# rename columns
+dnames <- data %>%
+  select(ends_with("_d")) %>%
+  names()
+dnames_i <- match(dnames, colnames(data))
+colnames(data)[dnames_i] <- paste0("d_", tolower(gsub("[^[:alnum:]_]", "",dummies)))
+
+# check if price is missing
+nrow(data %>% filter( is.na(price_day)))
+```
+
+
+```{r, include = FALSE, message=FALSE, warning=FALSE}
+# keep columns if contain d_, n_,f_, p_, usd_ and some others
+data <- data %>%
+  select(id,price_day,matches("^d_.*|^n_.*|^f_.*"))
+amenities_convert<- data %>%
+  select(starts_with("d_"),"id") 
+amenities_convert <- amenities_convert %>%mutate_if(is.integer,as.numeric)
+glimpse(amenities_convert)
+data <- data %>%
+  select(-starts_with("d_")) 
+data <- merge(data,amenities_convert, by = "id")
+data <- data %>% mutate(id = as.numeric(id))
+```
+
+```{r, include = FALSE, warning = FALSE, message = FALSE}
+# Infinite values changed with NaNs
+for (j in 1:ncol(data) ) data.table::set(data, which(is.infinite(data[[j]])), j, NA)
+
+# characters to factors
+data <- data %>%
+  mutate_if(is.character, factor)
+```
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+write.csv(data,"istanbul_clean.csv")
+```
+
+
+### END of cleaning ### 
+
+
+```{r, echo = FALSE, message=FALSE, warning=FALSE, include=FALSE}
+# --------------------------- EXPLORATORY DATA ANALYSIS ------------------------ #
+data <- read.csv("istanbul_clean.csv")
+
+### LABEL ENGINEERING ###
+summary(data$price_day)
+describe(data$price_day)
+
+# summary table for price
+price_stat <- data %>% summarise(
+    Variable = 'price_day',
+    Mean     = mean( price_day ),
+    `5th Percentile` = quantile(price_day, probs = 0.05),
+    Median   = median( price_day ),
+    `95th Percentile` = quantile(price_day, probs = 0.95),
+    Std      = sd( price_day ),
+    Min      = min( price_day ),
+    Max      = max( price_day ),
+    N        = n() )
+```
+
+```{r, , echo = FALSE, message=FALSE, warning=FALSE}
+# print table
+price_stat <- knitr::kable( price_stat, caption = "Descriptive statistics of target variable", digits = 2 ) %>% kable_styling( position = "center", latex_options = 'hold_position' )
+price_stat
+```
+
+```{r, echo = FALSE, message=FALSE, warning=FALSE, fig.align='center', fig.width=8}
+###### Price ######
+# Take log of price
+data <- data %>%
+  mutate(ln_price = log(price_day))
+# prices less than 95th percentile
+data <- data %>%
+  filter(price_day < 3900)
+# Price Distribution
+price_hist <- ggplot(data, aes( x = price_day)) +
+  geom_histogram(aes(y = (..count..)/sum(..count..)),fill = "#99d8c9", color = "#2ca25f") +
+  theme_bw() +
+  scale_y_continuous(labels = label_percent()) +
+  ylab("Percent") + 
+  xlab("Price")
+ln_price_hist <- ggplot(data, aes( x = ln_price)) +
+  geom_histogram(aes(y = (..count..)/sum(..count..)),fill = "#99d8c9", color = "#2ca25f") +
+  theme_bw() +
+  scale_y_continuous(labels = label_percent()) +
+  ylab("Percent") + 
+  xlab("Price (log)")
+price_hist_grid <- ggarrange(
+  price_hist,
+  ln_price_hist,
+  nrow = 1
+)
+price_hist_grid 
+```
+
+```{r, echo = FALSE, warning = FALSE, message = FALSE, fig.align='center', fig.width=10}
+### FEATURE ENGINEERING ###
+###### accommodation capacity & price ######
+accom_hist <- ggplot(data, aes(x = n_accommodates)) + geom_histogram(fill = "#2ca25f")+ theme_bw() +
+  labs(x = "Accommodation Capacity")
+accom_point <- ggplot(data = data, aes(x=n_accommodates, y=price_day)) +
+  geom_point(size=1, colour= "grey", shape=16)+
+  labs(x="Number of people accomodated",y="Price")+
+  geom_smooth(method="loess", colour= "#2ca25f", se=FALSE)+
+  theme_bw() +
+    labs(x = "Accommodation Capacity")
+accom_price <- ggplot(data, aes(x = factor(n_accommodates), y = price_day,
+                       fill = factor(d_instant_bookable))) +
+  geom_boxplot(alpha=0.8, na.rm=T, outlier.shape = NA, width = 0.8) +
+  scale_fill_manual(values=c("#2ca25f", "#99d8c9")) +
+  stat_boxplot(geom = "errorbar", width = 0.8, size = 0.3, na.rm=T)+
+  labs(x = "Accomodates (Persons)",y = "Price" , fill = "Instant_Bookable")+
+  theme_bw() +
+  theme(legend.position = "bottom")
+accom_combine <- ggarrange(
+  accom_hist,
+  accom_point,
+  accom_price,
+  nrow = 1)
+accom_combine
+```
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.align='center'}
+###### Property Type & Price ######
+property_type_box <- ggplot(data, aes(x = f_property_type, y = price_day)) +
+  stat_boxplot(aes(group = f_property_type), geom = "errorbar", width = 0.3,
+               na.rm=T) +
+  geom_boxplot(aes(group = f_property_type),
+               size = 0.5, width = 0.6,  fill = c("#99d8c9","#2ca25f"),alpha = 0.3, na.rm=T, outlier.shape = NA) +
+  scale_y_continuous(expand = c(0.01,0.01),limits = c(0,4000), breaks = seq(0,4000,400)) +
+  labs(x = "Property type",y = "Price")+
+  theme_bw()
+
+prop_with_accomm_box <- ggplot(data, aes(x = factor(n_accommodates), y = price_day,
+                        fill = f_property_type, color= f_property_type)) +
+  geom_boxplot(alpha=0.8, na.rm=T, outlier.shape = NA, width = 0.8, ) +
+ stat_boxplot(geom = "errorbar", width = 0.8, size = 0.3, na.rm=T)+
+  labs(x = "Accomodation Capacity",y = "Price") +
+  scale_y_continuous(expand = c(0.01,0.01), limits=c(0, 4000), breaks = seq(0,4000, 400)) +
+  theme_bw() + theme(legend.position = c(0.26,0.88)) + theme(legend.title = element_blank())
+
+price_prop_type <- ggarrange(
+  property_type_box,
+  prop_with_accomm_box,
+  nrow = 1, 
+  legend="bottom")
+price_prop_type
+```
+
+```{r, include = FALSE, warning = FALSE, message = FALSE, fig.align='center'}
+# Take logs of beds
+data <- data %>%
+  mutate(ln_beds = log(n_beds + 1))
+ggplot(data, aes(x = n_beds)) + geom_histogram() + theme_bw()
+# Plot a non parametric regression plot
+beds_plot <- ggplot(data = data, aes(x= ln_beds, y=price)) +
+  geom_point(size=1, colour= "cyan3", shape=16)+
+  labs(x="ln(Number of people accomodated)",y="ln(Price, Lira")+
+  geom_smooth(method="loess", colour= "red", se=FALSE)+
+  theme_bw()
+```
+
+```{r, include = FALSE, message=FALSE, warning=FALSE}
+###### Accommodates ######
+# Squares and further values to create for accommodation
+data <- data %>%
+  mutate(n_accommodates2=n_accommodates^2, ln_accommodates=log(n_accommodates))
+#price_plot <- ggplot(data = data, aes(x=ln_accommodates, y=price_day)) +
+  #geom_point(size=1, colour= "grey", shape=16)+
+  #labs(x="Number of people accomodated",y="Price")+
+  #geom_smooth(method="loess", colour= "#2ca25f", se=FALSE)+
+  #theme_bw()
+#price_plot
+```
+
+```{r bathroom chart, include = FALSE, warning = FALSE, message = FALSE}
+# Pool accommodations with 0,1,2,5 bathrooms
+data <- data %>%
+  mutate(f_bathroom = cut(n_bathrooms, c(0,1,2,5), labels=c(0,1,2), right = F) )
+```
+
+```{r number of reviews, include = FALSE, warning = FALSE, message = FALSE}
+# Pool number of reviews to 3 categories: none, 1-51 and >51
+data <- data %>%
+  mutate(f_number_of_reviews = cut(n_number_of_reviews, c(0,1,51,max(data$n_number_of_reviews)), labels=c(0,1,2), right = F))
+```
+
+```{r minimum_nights, include = FALSE, warning = FALSE, message = FALSE}
+# Pool and categorize the number of minimum nights: 1,2,3, 3+
+data <- data %>%
+  mutate(f_minimum_nights= cut(n_minimum_nights, c(1,2,3,max(data$n_minimum_nights)), labels=c(1,2,3), right = F))
+```
+
+```{r Impute NAs, include = FALSE, warning = FALSE, message = FALSE}
+# Change Infinite values with NaNs
+for (j in 1:ncol(data) ) data.table::set(data, which(is.infinite(data[[j]])), j, NA)
+```
+
+```{r Impute missing values, include = FALSE, warning = FALSE, message = FALSE}
+# Number of missing values in each column
+na_count <- sapply(data, function(y) sum(length(which(is.na(y)))))
+na_count <- data.frame(na_count)
+data <- data %>% 
+  drop_na(price_day)
+# Fill missing values
+data <- data %>%
+  mutate(
+    n_bathrooms =  ifelse(is.na(n_bathrooms), median(n_bathrooms, na.rm = T), n_bathrooms), #assume at least 1 bath
+    n_beds = ifelse(is.na(n_beds), n_accommodates, n_beds), #assume n_beds=n_accomodates
+    f_bathroom=ifelse(is.na(f_bathroom),1, f_bathroom),
+    f_minimum_nights=ifelse(is.na(f_minimum_nights),1, f_minimum_nights),
+    f_number_of_reviews=ifelse(is.na(f_number_of_reviews),1, f_number_of_reviews),
+    ln_beds=ifelse(is.na(ln_beds),0, ln_beds),
+    n_bedrooms=ifelse(is.na(n_bedrooms),1, n_bedrooms)
+  )
+data <- data %>%
+  mutate(
+    flag_review_scores_rating=ifelse(is.na(n_review_scores_rating),1, 0),
+    n_review_scores_rating =  ifelse(is.na(n_review_scores_rating), median(n_review_scores_rating, na.rm = T), n_review_scores_rating))
+```
+
+```{r data type, include = FALSE, warning = FALSE, message = FALSE}
+data <- data %>%
+  mutate_if(is.character, factor)
+```
+
+### END ### 
+
