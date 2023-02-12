@@ -15,9 +15,10 @@ Please open business report PDF
 
 
 To view codes used:
+Open D_3_A_2_RMD file
 
-Open D_3_A_2_RMD file. 
 
+[TECHNICAL REPORT](https://github.com/HasanMansoorKhan/Predictive-Models/blob/main/DA_3_A_2.Rmd)
 
 
 The clean data is uploaded here: Istanbul_clean_CSV
