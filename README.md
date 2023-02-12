@@ -3,7 +3,8 @@ Predictive models for Istanbul airbnb data
 
 To view Detailed Technical Report : 
 Please open technical report HTML
-[technical]([[https://github.com/user/repo/blob/branch/other_file.md](https://github.com/HasanMansoorKhan/Predictive-Models/blob/main/Detailed%20Technical%20Report.html](https://htmlpreview.github.io/?https://github.com/HasanMansoorKhan/Predictive-Models/blob/main/Detailed%20Technical%20Report.html)))
+
+[a link](https://htmlpreview.github.io/?https://github.com/HasanMansoorKhan/Predictive-Models/blob/main/Detailed%20Technical%20Report.html)
 
 
 
