@@ -69,7 +69,12 @@ Once the target variable is cleaned, I proceed to clean the predictor variables.
 
 ```{r Import data, message=FALSE, warning=FALSE, include=FALSE, cache=TRUE}
 # Import raw or uncleaned data
-data <- read.csv("istanbul_raw.csv")
+
+#data <- read.csv("istanbul_raw.csv")
+
+raw_url <- "https://raw.githubusercontent.com/HasanMansoorKhan/Rep-for-RAW/main/istanbul_raw.csv"
+data <- read.csv(raw_url)
+
 ```
 
 ```{r, include = FALSE, message=FALSE, warning=FALSE}
