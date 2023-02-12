@@ -8,10 +8,10 @@ Please open technical report HTML
 [TECHNICAL REPORT](https://htmlpreview.github.io/?https://github.com/HasanMansoorKhan/Predictive-Models/blob/main/Detailed%20Technical%20Report.html)
 
 
-
-To view Business Report:
+To view 3 pager Business Report:
 Please open business report PDF 
 
+[Business Report](https://github.com/HasanMansoorKhan/Predictive-Models/blob/main/Business-Report--Predictions-PDF.pdf)
 
 
 To view codes used:
