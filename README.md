@@ -6,7 +6,7 @@ Predictive models for Istanbul airbnb data
 To view 3 pager Business Report:
 Please open business report PDF 
 
-[Business Report](https://github.com/HasanMansoorKhan/Predictive-Models/blob/main/Business-Report--Predictions-PDF.pdf)
+[BUSINESS REPORT](https://github.com/HasanMansoorKhan/Predictive-Models/blob/main/Business-Report--Predictions-PDF.pdf)
 
 
 To view Detailed Technical Report : 
