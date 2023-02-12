@@ -330,7 +330,12 @@ The target variable price, which has been converted to numeric is key area of in
 # --------------------------- EXPLORATORY DATA ANALYSIS ------------------------ #
 
 # Read Clean CSV. Clean version is post data cleaning
-data <- read.csv("istanbul_clean.csv")
+
+#data <- read.csv("istanbul_clean.csv")
+
+clean_url <- "https://raw.githubusercontent.com/HasanMansoorKhan/Predictive-Models/main/istanbul_clean.csv"
+data <- read.csv(clean_url)
+
 
 ### LABEL ENGINEERING ###
 summary(data$price_day)
@@ -1024,7 +1029,6 @@ cart_model <- train(
 # Showing an alternative for plotting a tree
 cart_vis_tree <- fancyRpartPlot(cart_model$finalModel, sub = "")
 
-cart_vis_tree
 ```
 
 
@@ -1089,4 +1093,11 @@ result_3 <- rbind(line1, a, b) %>%
   transform(RMSE = as.numeric(RMSE), `Mean price` = as.numeric(`Mean price`),
             `RMSE/price` = as.numeric(`RMSE/price`))
 ```
+
+
+#### URL to github repository
+
+[Github Repository](https://github.com/HasanMansoorKhan/Predictive-Models).
+
+[Inside Airbnb](http://insideairbnb.com/get-the-data/).
 
