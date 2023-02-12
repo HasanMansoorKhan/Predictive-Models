@@ -1005,9 +1005,9 @@ ggarrange(pdp1, pdp2, pdp3,nrow = 1)
 
 ## CART 
 
-The last predictive model uses the Classification and Regression Tree also known as CART which builds a binary tree-like structure. Each node represents a binary decision. One of the key benefits of CART is interpretability as seen in the visualization below. 
+The last predictive model uses the Classification and Regression Tree also known as CART which builds a binary tree-like structure. Each node represents a binary decision. One of the key benefits of CART is interpretation as it can be visualized. However, the RMS for cart is very high compared to OLS and LASSO. The CART is producing a significantly higher RMSE and hence is not as accurate as other models. This may be due to the nature of the data or it is simply over fitting the data.
 
-```{r, echo = FALSE, warning = FALSE, message = FALSE, include=TRUE}
+```{r, echo = FALSE, warning = FALSE, message = FALSE, include=FALSE}
 # ----------------------------- CART ---------------------------- #
 ## CART
 set.seed(20230211)
@@ -1029,6 +1029,11 @@ cart_vis_tree
 
 
 ## Model Comparison
+
+
+To conclude, I compare the models using both the CV RMSE and Holdout RMSE. All models generate a cross validated RMSE  as well as a holdout RMSE. It is imperative that model has minimal possible RMSE and is suitable for predictions considering business requirements. The comparison shows that Random Forest method has the smallest RMSE for both the cross validated as well as hold out data. This shows that the Random Forest method predicts the price in the best possible manner for Istanbul Airbnb units that can accommodate 2-6 persons. As far as other models are concerned, CART has a significantly higher RMSE compared to OLS and LASSO. OLS and LASSO are both similar in terms of RMSE in Cross Validation and holdout data. OLS considering its simplicity can be considered but the Random Forest is by far the preferred predictive model in this case study. 
+
+
 
 ```{r, echo = FALSE, warning = FALSE, message = FALSE}
 # ----------------------------- MODEL SELECTION ---------------------------- #
